@@ -6,6 +6,7 @@ const IG_USER_ID = process.env.INSTAGRAM_USER_ID;
 const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || "instagram-images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
+const INSTAGRAM_CAPTION = "DM me for automation 🤖";
 
 function required(name, value) {
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -133,7 +134,11 @@ async function graph(path, options = {}) {
 }
 
 async function createContainer(imageUrl) {
-  const params = new URLSearchParams({ image_url: imageUrl, access_token: IG_TOKEN });
+  const params = new URLSearchParams({
+    image_url: imageUrl,
+    caption: INSTAGRAM_CAPTION,
+    access_token: IG_TOKEN,
+  });
   return graph(`${IG_USER_ID}/media?${params.toString()}`, { method: "POST" });
 }
 
