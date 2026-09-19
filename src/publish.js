@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v5-search-sort-fix";
+const AUTOMATION_BUILD = "dynamic-image-count-v6-regex-fix";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
