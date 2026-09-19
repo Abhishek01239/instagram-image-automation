@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v10-cloudinary-prefix-discovery";
+const AUTOMATION_BUILD = "dynamic-image-count-v11-global-asset-diagnostic";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -214,19 +214,28 @@ async function cloudinaryAssets() {
     );
   }
 
-  // Diagnostic: list a few images visible to these Cloudinary credentials.
-  // This tells us whether the API credentials point to the same cloud shown in the UI.
+  // Diagnostic: inspect a large global asset sample. If the dashboard shows 95
+  // images but this API only sees the default sample assets, the credentials
+  // are pointed at a different Cloudinary cloud/account (or the 95 assets are
+  // not uploaded into this cloud).
   {
-    const url = `${base}/resources/image/upload?max_results=10&direction=asc`;
+    const url = base + "/resources/image/upload?max_results=500&direction=asc";
     const result = await listCloudinary(url, auth);
     lastStatus = result.status;
     if (!result.ok) {
       lastError = result.data;
       console.log("Cloudinary lookup global-image-list: HTTP " + result.status + " " + JSON.stringify(result.data));
     } else {
+      const folders = [...new Set(result.resources.map(a => String(a.asset_folder || "").trim()).filter(Boolean))];
+      const nonSample = result.resources.filter(a => {
+        const id = String(a.public_id || "");
+        return id !== "sample" && !id.startsWith("samples/");
+      });
       console.log("Cloudinary lookup global-image-list: found " + result.resources.length + " image(s) visible to these credentials.");
-      for (const a of result.resources.slice(0, 10)) {
-        console.log("Cloudinary visible asset: public_id=" + String(a.public_id || "") + " asset_folder=" + String(a.asset_folder || "") + " secure_url=" + String(a.secure_url || ""));
+      console.log("Cloudinary global asset folders: " + JSON.stringify(folders));
+      console.log("Cloudinary non-sample asset count: " + nonSample.length);
+      for (const a of nonSample.slice(0, 50)) {
+        console.log("Cloudinary non-sample asset: public_id=" + String(a.public_id || "") + " asset_folder=" + String(a.asset_folder || "") + " secure_url=" + String(a.secure_url || ""));
       }
     }
   }
