@@ -214,7 +214,7 @@ async function cloudinaryAssets() {
       const assets = result.resources
         .filter(a => a.secure_url)
         .filter(a => {
-          const assetFolder = String(a.asset_folder || "").replace(/^\\/+|\\/+$/g, "").toLowerCase();
+          const assetFolder = String(a.asset_folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
           const publicId = String(a.public_id || "").toLowerCase();
           return assetFolder === wanted || assetFolder.startsWith(wanted + "/") ||
             publicId.startsWith(wanted + "/") || publicId.startsWith("home/" + wanted + "/");
