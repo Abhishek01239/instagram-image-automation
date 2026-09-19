@@ -169,7 +169,6 @@ async function cloudinaryAssets() {
       body: {
         expression: search.expression,
         max_results: 500,
-        sort_by: [{ created: "desc" }],
       },
     });
     lastStatus = result.status;
