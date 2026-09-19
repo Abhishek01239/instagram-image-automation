@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v11-global-asset-diagnostic";
+const AUTOMATION_BUILD = "dynamic-image-count-v12-global-folder-metadata-match";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -237,6 +237,20 @@ async function cloudinaryAssets() {
       for (const a of nonSample.slice(0, 50)) {
         console.log("Cloudinary non-sample asset: public_id=" + String(a.public_id || "") + " asset_folder=" + String(a.asset_folder || "") + " secure_url=" + String(a.secure_url || ""));
       }
+      // The GitHub Actions log masks secret values. If the Cloudinary
+      // asset_folder equals CLOUDINARY_FOLDER, the log may display it as "***".
+      // Use the metadata returned by this global listing directly; this avoids
+      // relying on Search API indexing for the folder.
+      const wantedFolder = folder.replace(/^\\/+|\\/+$/g, "").toLowerCase();
+      const matchedFolderAssets = result.resources
+        .filter(a => a.secure_url)
+        .filter(a => String(a.asset_folder || "").replace(/^\\/+|\\/+$/g, "").toLowerCase() === wantedFolder)
+        .sort((a, b) =>
+          (a.created_at || "").localeCompare(b.created_at || "") ||
+          String(a.public_id).localeCompare(String(b.public_id))
+        );
+      console.log("Cloudinary lookup global-image-list-folder-match: found " + matchedFolderAssets.length + " image(s).");
+      if (matchedFolderAssets.length > 0) return matchedFolderAssets;
     }
   }
   // If the Cloudinary UI folder name is not the same as the asset_folder
