@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v6-regex-fix";
+const AUTOMATION_BUILD = "dynamic-image-count-v7-cloudinary-search";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -130,6 +130,10 @@ async function cloudinaryAssets() {
       expression: 'asset_folder:"yt automation images"',
     },
     {
+      name: "search-asset-folder-wildcard",
+      expression: 'asset_folder:"yt automation images/*"',
+    },
+    {
       name: "search-fixed-folder",
       expression: 'folder:"yt automation images"',
     },
@@ -196,6 +200,7 @@ async function cloudinaryAssets() {
 
     if (!result.ok) {
       lastError = result.data;
+      console.log(`Cloudinary lookup ${candidate.name}: HTTP ${result.status} ${JSON.stringify(result.data)}`);
       continue;
     }
 
