@@ -119,7 +119,7 @@ async function listCloudinary(url, auth, options = {}) {
 async function cloudinaryAssets() {
   const auth = Buffer.from(`${CLOUD_KEY}:${CLOUD_SECRET}`).toString("base64");
   const base = `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUD_NAME)}`;
-  const folder = CLOUDINARY_FOLDER.trim().replace(/^\\/+|\\/+$/g, "");
+    const folder = CLOUDINARY_FOLDER.trim().replace(/^\/+|\/+$/g, "");
 
   // Cloudinary has two folder modes. In dynamic folder mode,
   // /resources/by_asset_folder is the direct lookup. Search API
