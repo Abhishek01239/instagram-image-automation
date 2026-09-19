@@ -120,6 +120,17 @@ async function cloudinaryAssets() {
   // /resources/by_asset_folder is the correct lookup. In legacy
   // fixed-folder mode, Cloudinary requires /resources/image/upload
   // with a public-ID prefix instead.
+  const searchExpressions = [
+    {
+      name: "search-asset-folder",
+      expression: 'asset_folder:"yt automation images"',
+    },
+    {
+      name: "search-fixed-folder",
+      expression: 'folder:"yt automation images"',
+    },
+  ];
+
   const candidates = [
     {
       name: "asset-folder",
@@ -146,6 +157,31 @@ async function cloudinaryAssets() {
 
   let lastStatus = null;
   let lastError = null;
+
+  // Cloudinary's Search API can locate assets by asset_folder in dynamic
+  // folder mode or folder in legacy fixed-folder mode.
+  for (const search of searchExpressions) {
+    const url = base + "/resources/search?expression=" +
+      encodeURIComponent(search.expression) +
+      "&max_results=500&sort_by[0][field]=created_at&sort_by[0][direction]=asc";
+    const result = await listCloudinary(url, auth);
+    lastStatus = result.status;
+    if (!result.ok) {
+      lastError = result.data;
+      continue;
+    }
+
+    const assets = result.resources
+      .filter(a => a.secure_url)
+      .sort((a, b) =>
+        (a.created_at || "").localeCompare(b.created_at || "") ||
+        String(a.public_id).localeCompare(String(b.public_id))
+      );
+
+    console.log(`Cloudinary lookup ${search.name}: found ${assets.length} image(s).`);
+
+    if (assets.length > 0) return assets;
+  }
 
   for (const candidate of candidates) {
     const result = await listCloudinary(candidate.url, auth);
