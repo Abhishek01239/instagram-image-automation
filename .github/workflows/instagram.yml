@@ -1,0 +1,17 @@
+name: Instagram Image Automation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7/28 * * * *"
+      timezone: "Asia/Kolkata"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node src/publish.js
