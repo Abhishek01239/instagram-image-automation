@@ -241,10 +241,10 @@ async function cloudinaryAssets() {
       // asset_folder equals CLOUDINARY_FOLDER, the log may display it as "***".
       // Use the metadata returned by this global listing directly; this avoids
       // relying on Search API indexing for the folder.
-      const wantedFolder = folder.replace(/^\\/+|\\/+$/g, "").toLowerCase();
+      const wantedFolder = folder.replace(/^\/+|\/+$/g, "").toLowerCase();
       const matchedFolderAssets = result.resources
         .filter(a => a.secure_url)
-        .filter(a => String(a.asset_folder || "").replace(/^\\/+|\\/+$/g, "").toLowerCase() === wantedFolder)
+        .filter(a => String(a.asset_folder || "").replace(/^\/+|\/+$/g, "").toLowerCase() === wantedFolder)
         .sort((a, b) =>
           (a.created_at || "").localeCompare(b.created_at || "") ||
           String(a.public_id).localeCompare(String(b.public_id))
