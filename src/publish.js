@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v4-search-post";
+const AUTOMATION_BUILD = "dynamic-image-count-v5-search-sort-fix";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -119,12 +119,11 @@ async function listCloudinary(url, auth, options = {}) {
 async function cloudinaryAssets() {
   const auth = Buffer.from(`${CLOUD_KEY}:${CLOUD_SECRET}`).toString("base64");
   const base = `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUD_NAME)}`;
-  const folder = CLOUDINARY_FOLDER.trim().replace(/^\/+|\/+$/g, "");
+  const folder = CLOUDINARY_FOLDER.trim().replace(/^\\/+|\\/+$/g, "");
 
   // Cloudinary has two folder modes. In dynamic folder mode,
-  // /resources/by_asset_folder is the correct lookup. In legacy
-  // fixed-folder mode, Cloudinary requires /resources/image/upload
-  // with a public-ID prefix instead.
+  // /resources/by_asset_folder is the direct lookup. Search API
+  // is also supported for both dynamic and legacy folder metadata.
   const searchExpressions = [
     {
       name: "search-asset-folder",
@@ -147,8 +146,6 @@ async function cloudinaryAssets() {
     },
   ];
 
-  // Also try Home/<folder> as a compatibility fallback if the
-  // configured folder is a root-level folder in the Console UI.
   if (!folder.toLowerCase().startsWith("home/")) {
     candidates.push({
       name: "asset-folder-home-fallback",
@@ -163,8 +160,8 @@ async function cloudinaryAssets() {
   let lastStatus = null;
   let lastError = null;
 
-  // Cloudinary's Search API is a POST endpoint. It can locate assets
-  // by asset_folder in dynamic folder mode or folder in legacy fixed-folder mode.
+  // Cloudinary Search API requires sort_by entries such as {created:"desc"}.
+  // We request newest-first, then reverse locally so rotation stays oldest-first.
   for (const search of searchExpressions) {
     const url = base + "/resources/search";
     const result = await listCloudinary(url, auth, {
@@ -172,7 +169,7 @@ async function cloudinaryAssets() {
       body: {
         expression: search.expression,
         max_results: 500,
-        sort_by: [{ field: "created_at", direction: "asc" }],
+        sort_by: [{ created: "desc" }],
       },
     });
     lastStatus = result.status;
@@ -220,7 +217,7 @@ async function cloudinaryAssets() {
   const detail = lastError ? ` Last API response: ${JSON.stringify(lastError)}` : "";
   throw new Error(
     `No images found using folder "${folder}". ` +
-    `Tried Cloudinary asset-folder and public-ID-prefix lookups (including a Home/ fallback). ` +
+    `Tried Cloudinary Search API, asset-folder, and public-ID-prefix lookups (including a Home/ fallback). ` +
     `Last HTTP status: ${lastStatus}.${detail}`
   );
 }
@@ -283,7 +280,6 @@ async function main() {
     throw new Error(`No images found in Cloudinary folder "${CLOUDINARY_FOLDER}".`);
   }
 
-  // Rotate through however many images actually exist.
   const imageNumber = state.nextIndex % assets.length;
   const asset = assets[imageNumber];
 
