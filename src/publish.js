@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v8-cloudinary-metadata-fallback";
+const AUTOMATION_BUILD = "dynamic-image-count-v9-cloudinary-credential-diagnostic";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -194,6 +194,22 @@ async function cloudinaryAssets() {
     if (assets.length > 0) return assets;
   }
 
+  // Diagnostic: list a few images visible to these Cloudinary credentials.
+  // This tells us whether the API credentials point to the same cloud shown in the UI.
+  {
+    const url = `${base}/resources/image/upload?max_results=10&direction=asc`;
+    const result = await listCloudinary(url, auth);
+    lastStatus = result.status;
+    if (!result.ok) {
+      lastError = result.data;
+      console.log("Cloudinary lookup global-image-list: HTTP " + result.status + " " + JSON.stringify(result.data));
+    } else {
+      console.log("Cloudinary lookup global-image-list: found " + result.resources.length + " image(s) visible to these credentials.");
+      for (const a of result.resources.slice(0, 10)) {
+        console.log("Cloudinary visible asset: public_id=" + String(a.public_id || "") + " asset_folder=" + String(a.asset_folder || "") + " secure_url=" + String(a.secure_url || ""));
+      }
+    }
+  }
   // If the Cloudinary UI folder name is not the same as the asset_folder
   // metadata, search images globally and match the requested folder locally.
   {
