@@ -7,6 +7,8 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || "instagram-images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
+const AUTOMATION_BUILD = "dynamic-image-count-v3";
+console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
