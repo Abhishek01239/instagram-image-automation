@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v7-cloudinary-search";
+const AUTOMATION_BUILD = "dynamic-image-count-v8-cloudinary-metadata-fallback";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -192,6 +192,40 @@ async function cloudinaryAssets() {
     console.log(`Cloudinary lookup ${search.name}: found ${assets.length} image(s).`);
 
     if (assets.length > 0) return assets;
+  }
+
+  // If the Cloudinary UI folder name is not the same as the asset_folder
+  // metadata, search images globally and match the requested folder locally.
+  {
+    const url = base + "/resources/search";
+    const result = await listCloudinary(url, auth, {
+      method: "POST",
+      body: {
+        expression: "resource_type:image",
+        max_results: 500,
+      },
+    });
+    lastStatus = result.status;
+    if (!result.ok) {
+      lastError = result.data;
+      console.log("Cloudinary lookup search-all-images: HTTP " + result.status + " " + JSON.stringify(result.data));
+    } else {
+      const wanted = folder.toLowerCase();
+      const assets = result.resources
+        .filter(a => a.secure_url)
+        .filter(a => {
+          const assetFolder = String(a.asset_folder || "").replace(/^\\/+|\\/+$/g, "").toLowerCase();
+          const publicId = String(a.public_id || "").toLowerCase();
+          return assetFolder === wanted || assetFolder.startsWith(wanted + "/") ||
+            publicId.startsWith(wanted + "/") || publicId.startsWith("home/" + wanted + "/");
+        })
+        .sort((a, b) =>
+          (a.created_at || "").localeCompare(b.created_at || "") ||
+          String(a.public_id).localeCompare(String(b.public_id))
+        );
+      console.log("Cloudinary lookup search-all-images: found " + assets.length + " matching image(s).");
+      if (assets.length > 0) return assets;
+    }
   }
 
   for (const candidate of candidates) {
