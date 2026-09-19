@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v13-instagram-4x5-normalization";
+const AUTOMATION_BUILD = "dynamic-image-count-v14-batch-publish";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -414,26 +414,35 @@ async function main() {
     throw new Error(`No images found in Cloudinary folder "${CLOUDINARY_FOLDER}".`);
   }
 
-  const imageNumber = state.nextIndex % assets.length;
-  const asset = assets[imageNumber];
+  const remainingToday = DAILY_LIMIT - state.postedToday;
+  const postsThisRun = Math.min(remainingToday, assets.length);
 
-  console.log(`Publishing image ${imageNumber + 1}/${assets.length}: ${asset.public_id}`);
+  console.log(`Starting batch: publishing ${postsThisRun} image(s) this run. Current position: ${state.nextIndex + 1}/${assets.length}.`);
 
-  const container = await createContainer(asset.secure_url);
-  await waitForContainer(container.id);
-  const published = await publishContainer(container.id);
+  for (let i = 0; i < postsThisRun; i++) {
+    const imageNumber = state.nextIndex % assets.length;
+    const asset = assets[imageNumber];
 
-  state.nextIndex = (imageNumber + 1) % assets.length;
-  state.postedToday += 1;
-  state.sha = await saveState(state);
+    console.log(`Publishing image ${imageNumber + 1}/${assets.length}: ${asset.public_id}`);
 
-  console.log(JSON.stringify({
-    success: true,
-    instagram_media_id: published.id,
-    image_number: imageNumber + 1,
-    posted_today: state.postedToday,
-    day: state.day,
-  }, null, 2));
+    const container = await createContainer(asset.secure_url);
+    await waitForContainer(container.id);
+    const published = await publishContainer(container.id);
+
+    state.nextIndex = (imageNumber + 1) % assets.length;
+    state.postedToday += 1;
+    state.sha = await saveState(state);
+
+    console.log(JSON.stringify({
+      success: true,
+      instagram_media_id: published.id,
+      image_number: imageNumber + 1,
+      posted_today: state.postedToday,
+      day: state.day,
+    }, null, 2));
+  }
+
+  console.log(`Batch complete: ${state.postedToday}/${DAILY_LIMIT} posts today. Next image: ${state.nextIndex + 1}/${assets.length}.`);
 }
 
 main().catch(err => {
