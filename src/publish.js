@@ -163,14 +163,14 @@ async function cloudinaryAssets() {
 
     console.log(`Cloudinary lookup ${candidate.name}: found ${assets.length} image(s).`);
 
-    if (assets.length >= 200) {
-      return assets.slice(0, 200);
+    if (assets.length > 0) {
+      return assets;
     }
   }
 
   const detail = lastError ? ` Last API response: ${JSON.stringify(lastError)}` : "";
   throw new Error(
-    `Found fewer than 200 images using folder "${folder}". ` +
+    `No images found using folder "${folder}". ` +
     `Tried Cloudinary asset-folder and public-ID-prefix lookups (including a Home/ fallback). ` +
     `Last HTTP status: ${lastStatus}.${detail}`
   );
@@ -230,16 +230,21 @@ async function main() {
   }
 
   const assets = await cloudinaryAssets();
-  const imageNumber = state.nextIndex % 200;
+  if (assets.length === 0) {
+    throw new Error(`No images found in Cloudinary folder "${CLOUDINARY_FOLDER}".`);
+  }
+
+  // Rotate through however many images actually exist.
+  const imageNumber = state.nextIndex % assets.length;
   const asset = assets[imageNumber];
 
-  console.log(`Publishing image ${imageNumber + 1}/200: ${asset.public_id}`);
+  console.log(`Publishing image ${imageNumber + 1}/${assets.length}: ${asset.public_id}`);
 
   const container = await createContainer(asset.secure_url);
   await waitForContainer(container.id);
   const published = await publishContainer(container.id);
 
-  state.nextIndex = (imageNumber + 1) % 200;
+  state.nextIndex = (imageNumber + 1) % assets.length;
   state.postedToday += 1;
   state.sha = await saveState(state);
 
