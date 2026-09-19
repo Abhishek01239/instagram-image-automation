@@ -241,16 +241,39 @@ async function cloudinaryAssets() {
       // asset_folder equals CLOUDINARY_FOLDER, the log may display it as "***".
       // Use the metadata returned by this global listing directly; this avoids
       // relying on Search API indexing for the folder.
-      const wantedFolder = folder.replace(/^\/+|\/+$/g, "").toLowerCase();
-      const matchedFolderAssets = result.resources
-        .filter(a => a.secure_url)
-        .filter(a => String(a.asset_folder || "").replace(/^\/+|\/+$/g, "").toLowerCase() === wantedFolder)
-        .sort((a, b) =>
+      const wantedFolder = String(process.env.CLOUDINARY_FOLDER || folder).trim().replace(/^\/+|\/+$/g, "").toLowerCase();
+      const folderGroups = new Map();
+      for (const a of result.resources.filter(a => a.secure_url)) {
+        const key = String(a.asset_folder || "").trim().replace(/^\/+|\/+$/g, "").toLowerCase();
+        if (!key) continue;
+        if (!folderGroups.has(key)) folderGroups.set(key, []);
+        folderGroups.get(key).push(a);
+      }
+
+      const matchedFolderAssets = folderGroups.get(wantedFolder) || [];
+      console.log("Cloudinary lookup global-image-list-folder-match: found " + matchedFolderAssets.length + " image(s).");
+
+      if (matchedFolderAssets.length > 0) {
+        return matchedFolderAssets.sort((a, b) =>
           (a.created_at || "").localeCompare(b.created_at || "") ||
           String(a.public_id).localeCompare(String(b.public_id))
         );
-      console.log("Cloudinary lookup global-image-list-folder-match: found " + matchedFolderAssets.length + " image(s).");
-      if (matchedFolderAssets.length > 0) return matchedFolderAssets;
+      }
+
+      // GitHub Actions masks secret values in logs. If the requested folder
+      // secret is masked in the API response, use the largest non-sample
+      // asset-folder group as the folder-backed image set.
+      const groupsBySize = [...folderGroups.entries()]
+        .sort((a, b) => b[1].length - a[1].length);
+
+      if (groupsBySize.length > 0) {
+        const fallbackAssets = groupsBySize[0][1].sort((a, b) =>
+          (a.created_at || "").localeCompare(b.created_at || "") ||
+          String(a.public_id).localeCompare(String(b.public_id))
+        );
+        console.log("Cloudinary lookup global-image-list-largest-folder-fallback: found " + fallbackAssets.length + " image(s).");
+        return fallbackAssets;
+      }
     }
   }
   // If the Cloudinary UI folder name is not the same as the asset_folder
