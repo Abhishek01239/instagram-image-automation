@@ -86,42 +86,94 @@ async function saveState(state) {
   return result.content.sha;
 }
 
+async function listCloudinary(url, auth) {
+  const response = await fetch(url, {
+    headers: { Authorization: `Basic ${auth}` },
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      data,
+      resources: [],
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    data,
+    resources: data.resources || [],
+  };
+}
+
 async function cloudinaryAssets() {
   const auth = Buffer.from(`${CLOUD_KEY}:${CLOUD_SECRET}`).toString("base64");
   const base = `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUD_NAME)}`;
-  const folderUrl =
-    `${base}/resources/by_asset_folder?asset_folder=${encodeURIComponent(CLOUDINARY_FOLDER)}&max_results=500&direction=asc&fields=public_id,secure_url,format,created_at`;
+  const folder = CLOUDINARY_FOLDER.trim().replace(/^\/+|\/+$/g, "");
 
-  let response = await fetch(folderUrl, {
-    headers: { Authorization: `Basic ${auth}` },
-  });
-  let data;
+  // Cloudinary has two folder modes. In dynamic folder mode,
+  // /resources/by_asset_folder is the correct lookup. In legacy
+  // fixed-folder mode, Cloudinary requires /resources/image/upload
+  // with a public-ID prefix instead.
+  const candidates = [
+    {
+      name: "asset-folder",
+      url: `${base}/resources/by_asset_folder?asset_folder=${encodeURIComponent(folder)}&max_results=500&direction=asc&fields=public_id,secure_url,format,created_at`,
+    },
+    {
+      name: "public-id-prefix",
+      url: `${base}/resources/image/upload?prefix=${encodeURIComponent(folder + "/")}&max_results=500&direction=asc`,
+    },
+  ];
 
-  if (response.ok) {
-    data = await response.json();
-  } else {
-    const prefixUrl =
-      `${base}/resources/image/upload?prefix=${encodeURIComponent(CLOUDINARY_FOLDER + "/")}&max_results=500`;
-    response = await fetch(prefixUrl, {
-      headers: { Authorization: `Basic ${auth}` },
+  // Also try Home/<folder> as a compatibility fallback if the
+  // configured folder is a root-level folder in the Console UI.
+  if (!folder.toLowerCase().startsWith("home/")) {
+    candidates.push({
+      name: "asset-folder-home-fallback",
+      url: `${base}/resources/by_asset_folder?asset_folder=${encodeURIComponent("Home/" + folder)}&max_results=500&direction=asc&fields=public_id,secure_url,format,created_at`,
     });
-    data = await response.json();
-    if (!response.ok) {
-      throw new Error(`Cloudinary asset listing failed: ${JSON.stringify(data)}`);
+    candidates.push({
+      name: "public-id-prefix-home-fallback",
+      url: `${base}/resources/image/upload?prefix=${encodeURIComponent("Home/" + folder + "/")}&max_results=500&direction=asc`,
+    });
+  }
+
+  let lastStatus = null;
+  let lastError = null;
+
+  for (const candidate of candidates) {
+    const result = await listCloudinary(candidate.url, auth);
+    lastStatus = result.status;
+
+    if (!result.ok) {
+      lastError = result.data;
+      continue;
+    }
+
+    const assets = result.resources
+      .filter(a => a.secure_url)
+      .sort((a, b) =>
+        (a.created_at || "").localeCompare(b.created_at || "") ||
+        String(a.public_id).localeCompare(String(b.public_id))
+      );
+
+    console.log(`Cloudinary lookup ${candidate.name}: found ${assets.length} image(s).`);
+
+    if (assets.length >= 200) {
+      return assets.slice(0, 200);
     }
   }
 
-  const assets = (data.resources || [])
-    .filter(a => a.secure_url)
-    .sort((a, b) =>
-      (a.created_at || "").localeCompare(b.created_at || "") ||
-      String(a.public_id).localeCompare(String(b.public_id))
-    );
-
-  if (assets.length < 200) {
-    throw new Error(`Found only ${assets.length} images in "${CLOUDINARY_FOLDER}". Need at least 200.`);
-  }
-  return assets.slice(0, 200);
+  const detail = lastError ? ` Last API response: ${JSON.stringify(lastError)}` : "";
+  throw new Error(
+    `Found fewer than 200 images using folder "${folder}". ` +
+    `Tried Cloudinary asset-folder and public-ID-prefix lookups (including a Home/ fallback). ` +
+    `Last HTTP status: ${lastStatus}.${detail}`
+  );
 }
 
 async function graph(path, options = {}) {
