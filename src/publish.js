@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v3";
+const AUTOMATION_BUILD = "dynamic-image-count-v4-search-post";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -88,9 +88,14 @@ async function saveState(state) {
   return result.content.sha;
 }
 
-async function listCloudinary(url, auth) {
+async function listCloudinary(url, auth, options = {}) {
   const response = await fetch(url, {
-    headers: { Authorization: `Basic ${auth}` },
+    method: options.method || "GET",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(options.body ? { body: JSON.stringify(options.body) } : {}),
   });
   const data = await response.json().catch(() => ({}));
 
@@ -158,16 +163,22 @@ async function cloudinaryAssets() {
   let lastStatus = null;
   let lastError = null;
 
-  // Cloudinary's Search API can locate assets by asset_folder in dynamic
-  // folder mode or folder in legacy fixed-folder mode.
+  // Cloudinary's Search API is a POST endpoint. It can locate assets
+  // by asset_folder in dynamic folder mode or folder in legacy fixed-folder mode.
   for (const search of searchExpressions) {
-    const url = base + "/resources/search?expression=" +
-      encodeURIComponent(search.expression) +
-      "&max_results=500&sort_by[0][field]=created_at&sort_by[0][direction]=asc";
-    const result = await listCloudinary(url, auth);
+    const url = base + "/resources/search";
+    const result = await listCloudinary(url, auth, {
+      method: "POST",
+      body: {
+        expression: search.expression,
+        max_results: 500,
+        sort_by: [{ field: "created_at", direction: "asc" }],
+      },
+    });
     lastStatus = result.status;
     if (!result.ok) {
       lastError = result.data;
+      console.log(`Cloudinary lookup ${search.name}: HTTP ${result.status} ${JSON.stringify(result.data)}`);
       continue;
     }
 
