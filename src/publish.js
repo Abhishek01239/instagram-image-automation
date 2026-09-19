@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v9-cloudinary-credential-diagnostic";
+const AUTOMATION_BUILD = "dynamic-image-count-v10-cloudinary-prefix-discovery";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -192,6 +192,26 @@ async function cloudinaryAssets() {
     console.log(`Cloudinary lookup ${search.name}: found ${assets.length} image(s).`);
 
     if (assets.length > 0) return assets;
+  }
+
+  // Direct prefix search for the actual uploaded assets. Cloudinary's dynamic-folder
+  // API metadata can differ from the dashboard folder label, so try common public-ID
+  // representations of the requested folder as well.
+  const prefixVariants = [folder, `Home/${folder}`, `home/${folder}`];
+  for (const prefix of prefixVariants) {
+    const url = `${base}/resources/image/upload?prefix=${encodeURIComponent(prefix)}&max_results=500`;
+    const result = await listCloudinary(url, auth);
+    lastStatus = result.status;
+    if (!result.ok) {
+      lastError = result.data;
+      console.log("Cloudinary lookup prefix-variant-" + prefix + ": HTTP " + result.status + " " + JSON.stringify(result.data));
+      continue;
+    }
+    const assets = result.resources.filter(a => a.secure_url);
+    console.log("Cloudinary lookup prefix-variant-" + prefix + ": found " + assets.length + " image(s).");
+    if (assets.length > 0) return assets.sort((a,b) =>
+      (a.created_at || "").localeCompare(b.created_at || "") || String(a.public_id).localeCompare(String(b.public_id))
+    );
   }
 
   // Diagnostic: list a few images visible to these Cloudinary credentials.
