@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v12-global-folder-metadata-match";
+const AUTOMATION_BUILD = "dynamic-image-count-v13-instagram-4x5-normalization";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -351,9 +351,23 @@ async function graph(path, options = {}) {
   return data;
 }
 
+function instagramSafeImageUrl(imageUrl) {
+  // Instagram feed publishing rejects unsupported aspect ratios.
+  // Normalize every Cloudinary image to an exact 4:5 canvas (1080x1350)
+  // without cropping the source image, then serve it as JPEG.
+  const marker = "/image/upload/";
+  const index = imageUrl.indexOf(marker);
+  if (index === -1) return imageUrl;
+  return imageUrl.slice(0, index + marker.length) +
+    "c_pad,w_1080,h_1350,b_auto,f_jpg,q_auto/" +
+    imageUrl.slice(index + marker.length);
+}
+
 async function createContainer(imageUrl) {
+  const safeImageUrl = instagramSafeImageUrl(imageUrl);
+  console.log("Instagram image normalized to 4:5 for publishing.");
   const params = new URLSearchParams({
-    image_url: imageUrl,
+    image_url: safeImageUrl,
     caption: INSTAGRAM_CAPTION,
     access_token: IG_TOKEN,
   });
