@@ -7,7 +7,7 @@ const IG_VERSION = process.env.IG_GRAPH_VERSION || "v24.0";
 const CLOUDINARY_FOLDER = "yt automation images";
 const DAILY_LIMIT = Number(process.env.DAILY_POST_LIMIT || 50);
 const INSTAGRAM_CAPTION = "DM me for automation 🤖";
-const AUTOMATION_BUILD = "dynamic-image-count-v14-batch-publish";
+const AUTOMATION_BUILD = "dynamic-image-count-v15-jpeg-extension-fix";
 console.log(`Automation build: ${AUTOMATION_BUILD}`);
 
 function required(name, value) {
@@ -352,15 +352,30 @@ async function graph(path, options = {}) {
 }
 
 function instagramSafeImageUrl(imageUrl) {
-  // Instagram feed publishing rejects unsupported aspect ratios.
-  // Normalize every Cloudinary image to an exact 4:5 canvas (1080x1350)
-  // without cropping the source image, then serve it as JPEG.
+  // Instagram needs a directly fetchable photo URL. Cloudinary's f_jpg
+  // converts the bytes, but the delivery URL should also end in .jpg so
+  // the fetched media has an unambiguous JPEG content type.
+  // Normalize every image to an exact 4:5 canvas (1080x1350) without cropping.
   const marker = "/image/upload/";
   const index = imageUrl.indexOf(marker);
   if (index === -1) return imageUrl;
-  return imageUrl.slice(0, index + marker.length) +
-    "c_pad,w_1080,h_1350,b_auto,f_jpg,q_auto/" +
-    imageUrl.slice(index + marker.length);
+
+  const prefix = imageUrl.slice(0, index + marker.length);
+  const rest = imageUrl.slice(index + marker.length);
+  const lastSlash = rest.lastIndexOf("/");
+  const dir = lastSlash >= 0 ? rest.slice(0, lastSlash + 1) : "";
+  let filename = lastSlash >= 0 ? rest.slice(lastSlash + 1) : rest;
+
+  // Remove the original extension. The explicit .jpg extension below makes
+  // Cloudinary deliver the transformed asset as a real JPEG.
+  filename = filename.replace(/\.[^.]+$/, "");
+  if (!filename) filename = "image";
+
+  return prefix +
+    "c_pad,w_1080,h_1350,b_auto,q_auto/" +
+    dir +
+    filename +
+    ".jpg";
 }
 
 async function createContainer(imageUrl) {
